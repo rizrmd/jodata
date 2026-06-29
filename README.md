@@ -11,12 +11,14 @@ jodata/
     internal/
     go.mod
     go.sum
-  frontend/  # Browser frontend (single-page app)
+  frontend/  # Browser frontend (Vite + React SPA source)
     index.html
+    package.json
+    src/
 ```
 
-`backend` is the only service process. The frontend is a static asset package consumed by
-`backend` at runtime.
+`backend` is the only service process. The React frontend is built into `frontend/dist`
+and served by `backend` at runtime.
 
 ## Build and run backend + SPA
 
@@ -43,8 +45,7 @@ Equivalent manual flow:
 
 ```sh
 cd frontend
-mkdir -p dist
-cp index.html dist/index.html
+npm run build
 cd ../backend
 JODATA_FRONTEND_BUILD_DIR=../frontend/dist go run ./cmd/server
 ```
@@ -77,13 +78,14 @@ When configured, send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
 
 ## Frontend
 
-The full frontend implementation is in [`frontend/index.html`](frontend/index.html), containing:
+The full frontend implementation is in [`frontend/src`](frontend/src), containing:
 
 - file/URL/API upload flows
 - intermediary payload import
 - parser profile management
-- metric/visualization creation
-- AI auto-chart + auto-dashboard + auto-build
+- Superset-style dataset navigation
+- AI chart studio for chat-led chart creation and refinement
+- AI auto-chart + auto-build workflows
 - chart and dashboard views
 - bundle import/export
 

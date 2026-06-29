@@ -6,11 +6,11 @@ build-frontend:
 	elif [ -f frontend/package.json ]; then \
 		echo "npm not found; falling back to static index.html copy."; \
 		test -d frontend/dist || mkdir -p frontend/dist; \
-		cp frontend/index.html frontend/dist/index.html; \
+		cp backend/internal/httpapi/index.html frontend/dist/index.html; \
 		echo "Wrote frontend/dist/index.html"; \
 	else \
 		mkdir -p frontend/dist; \
-		cp frontend/index.html frontend/dist/index.html; \
+		cp backend/internal/httpapi/index.html frontend/dist/index.html; \
 		echo "Wrote frontend/dist/index.html"; \
 	fi
 

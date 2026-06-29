@@ -29,7 +29,8 @@ import (
 
 //go:embed index.html
 var indexHTML []byte
-const defaultFrontendIndexPath = "../frontend/index.html"
+
+const defaultFrontendIndexPath = "../backend/internal/httpapi/index.html"
 const defaultFrontendBuildDir = "../frontend/dist"
 const defaultMaxRequestBytes = 32 * 1024 * 1024
 
@@ -54,6 +55,16 @@ type createMetricRequest struct {
 
 type updateChartRequest struct {
 	Prompt string `json:"prompt"`
+}
+
+type updateDashboardRequest struct {
+	Title   string             `json:"title"`
+	Layout  []dashboard.Item   `json:"layout"`
+	Filters []dashboard.Filter `json:"filters"`
+}
+
+type dashboardChatRequest struct {
+	Message string `json:"message"`
 }
 
 type autoDashboardRequest struct {
@@ -119,11 +130,12 @@ type addChartToDashboardRequest struct {
 }
 
 type dashboardDetail struct {
-	ID       string           `json:"id"`
-	Title    string           `json:"title"`
-	ChartIDs []string         `json:"chart_ids"`
-	Layout   []dashboard.Item `json:"layout"`
-	Charts   []chart.Config   `json:"charts"`
+	ID       string             `json:"id"`
+	Title    string             `json:"title"`
+	ChartIDs []string           `json:"chart_ids"`
+	Layout   []dashboard.Item   `json:"layout"`
+	Filters  []dashboard.Filter `json:"filters"`
+	Charts   []chart.Config     `json:"charts"`
 }
 
 func NewServer(store *store.MemoryStore) Server {
@@ -173,7 +185,9 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/dashboards", s.createDashboard)
 	mux.HandleFunc("GET /api/dashboards", s.listDashboards)
 	mux.HandleFunc("GET /api/dashboards/{id}", s.getDashboard)
+	mux.HandleFunc("PUT /api/dashboards/{id}", s.updateDashboard)
 	mux.HandleFunc("PUT /api/dashboards/{id}/charts", s.addChartToDashboard)
+	mux.HandleFunc("POST /api/dashboards/{id}/chat", s.chatDashboard)
 	mux.HandleFunc("POST /api/parser-profiles", s.saveParserProfile)
 	mux.HandleFunc("GET /api/parser-profiles", s.listParserProfiles)
 	mux.HandleFunc("/", s.spa)
@@ -897,8 +911,178 @@ func (s Server) writeDashboardDetail(w http.ResponseWriter, status int, dash das
 		Title:    dash.Title,
 		ChartIDs: dash.ChartIDs,
 		Layout:   dash.Layout,
+		Filters:  dash.Filters,
 		Charts:   charts,
 	})
+}
+
+func (s Server) updateDashboard(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r, security.PermWrite) {
+		return
+	}
+	dash, ok := s.store.Dashboard(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "dashboard not found")
+		return
+	}
+	var req updateDashboardRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if title := strings.TrimSpace(req.Title); title != "" {
+		dash.Title = title
+	}
+	if len(req.Filters) > 0 {
+		dash.Filters = sanitizeDashboardFilters(req.Filters)
+	}
+	if len(req.Layout) > 0 {
+		layout, err := normalizeDashboardLayout(s.store.Chart, req.Layout)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		dash.Layout = layout
+		dash.ChartIDs = make([]string, 0, len(layout))
+		for _, item := range layout {
+			if item.ChartID != "" {
+				dash.ChartIDs = append(dash.ChartIDs, item.ChartID)
+			}
+		}
+	}
+	s.store.UpdateDashboard(dash)
+	s.writeDashboardDetail(w, http.StatusOK, dash)
+}
+
+func (s Server) chatDashboard(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r, security.PermWrite) {
+		return
+	}
+	dash, ok := s.store.Dashboard(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "dashboard not found")
+		return
+	}
+	var req dashboardChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	filter, action, err := parseDashboardFilterMessage(req.Message)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	switch action {
+	case "clear":
+		dash.Filters = nil
+	default:
+		dash = dashboard.AddFilter(dash, filter)
+	}
+	s.store.UpdateDashboard(dash)
+	s.writeDashboardDetail(w, http.StatusOK, dash)
+}
+
+func parseDashboardFilterMessage(message string) (expression string, action string, err error) {
+	raw := strings.TrimSpace(message)
+	if raw == "" {
+		return "", "", fmt.Errorf("filter message is required")
+	}
+
+	lower := strings.ToLower(raw)
+	if strings.HasPrefix(lower, "clear filters") || strings.HasPrefix(lower, "clear filter") || lower == "clear" {
+		return "", "clear", nil
+	}
+
+	expr := raw
+	prefixes := []string{
+		"add filter:",
+		"add filter",
+		"apply filter:",
+		"apply filter",
+		"filter:",
+		"filter",
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(strings.ToLower(expr), prefix) {
+			expr = strings.TrimSpace(expr[len(prefix):])
+			break
+		}
+	}
+	expr = normalizeFilterExpression(expr)
+	if expr == "" {
+		return "", "", fmt.Errorf("could not detect filter expression; use format: <column> <operator> <value>")
+	}
+	return expr, "add", nil
+}
+
+func normalizeFilterExpression(value string) string {
+	expr := strings.TrimSpace(value)
+	if expr == "" {
+		return ""
+	}
+
+	if idx := strings.Index(expr, ":"); idx >= 0 {
+		expr = expr[:idx] + " = " + strings.TrimSpace(expr[idx+1:])
+	}
+
+	expr = strings.ReplaceAll(expr, " equals ", " = ")
+	expr = strings.ReplaceAll(expr, " is ", " = ")
+	expr = strings.ReplaceAll(expr, " contains ", " CONTAINS ")
+
+	if strings.Contains(expr, "=") ||
+		strings.Contains(expr, "!=") ||
+		strings.Contains(expr, ">=") ||
+		strings.Contains(expr, "<=") ||
+		strings.Contains(expr, ">") ||
+		strings.Contains(expr, "<") ||
+		strings.Contains(strings.ToLower(expr), "contains") {
+		return strings.TrimSpace(expr)
+	}
+	return ""
+}
+
+func normalizeDashboardLayout(chartLookup func(string) (chart.Config, bool), rawLayout []dashboard.Item) ([]dashboard.Item, error) {
+	layout := make([]dashboard.Item, 0, len(rawLayout))
+	seen := map[string]struct{}{}
+	for index, item := range rawLayout {
+		chartID := strings.TrimSpace(item.ChartID)
+		if chartID == "" {
+			return nil, fmt.Errorf("layout item %d is missing chart_id", index+1)
+		}
+		if _, ok := chartLookup(chartID); !ok {
+			return nil, fmt.Errorf("chart %q does not exist", chartID)
+		}
+		if _, exists := seen[chartID]; exists {
+			return nil, fmt.Errorf("duplicate chart %q in layout", chartID)
+		}
+		seen[chartID] = struct{}{}
+		item.ChartID = chartID
+		layout = append(layout, item)
+	}
+	return layout, nil
+}
+
+func sanitizeDashboardFilters(filters []dashboard.Filter) []dashboard.Filter {
+	kept := make([]dashboard.Filter, 0, len(filters))
+	seen := map[string]struct{}{}
+	for _, filter := range filters {
+		expr := strings.TrimSpace(filter.Expression)
+		expr = normalizeFilterExpression(expr)
+		if expr == "" {
+			continue
+		}
+		if _, ok := seen[expr]; ok {
+			continue
+		}
+		seen[expr] = struct{}{}
+		filter.Expression = expr
+		if strings.TrimSpace(filter.AddedAt) == "" {
+			filter.AddedAt = time.Now().UTC().Format(time.RFC3339)
+		}
+		kept = append(kept, filter)
+	}
+	return kept
 }
 
 func (s Server) addChartToDashboard(w http.ResponseWriter, r *http.Request) {
