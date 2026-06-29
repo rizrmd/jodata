@@ -1,0 +1,22 @@
+# Go build artifacts
+/backend/bin/
+*.test
+*.out
+
+# Runtime and environment files
+.env
+.env.*
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Frontend build output
+/frontend/dist/
+/frontend/node_modules/
+
+# Local runtime data
+/.data/
+*.log
