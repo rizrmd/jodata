@@ -34,6 +34,11 @@ Build commands:
 make build-frontend
 ```
 
+Runtime hardening env vars:
+
+- `JODATA_CORS_ORIGINS` (comma-separated list or `*`, defaults to `*`)
+- `JODATA_MAX_REQUEST_BYTES` (default `33554432`, bytes)
+
 Equivalent manual flow:
 
 ```sh
@@ -86,3 +91,10 @@ Backend preference:
 - uses `JODATA_FRONTEND_BUILD_DIR` (default `../frontend/dist`) for static assets and `index.html` when serving SPA routes
 - uses `JODATA_FRONTEND_INDEX` when set, otherwise attempts `../frontend/dist/index.html`, then `../frontend/index.html` in relation to backend working dir
 - falls back to embedded copy for robustness
+
+Basic manual verification:
+
+- `make run-server`
+- open `http://localhost:8080`
+- `curl http://localhost:8080/health`
+- `curl -X POST http://localhost:8080/api/datasets` (should return auth error when API keys are enabled, or `400` if no payload is sent)

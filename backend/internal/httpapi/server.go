@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +31,7 @@ import (
 var indexHTML []byte
 const defaultFrontendIndexPath = "../frontend/index.html"
 const defaultFrontendBuildDir = "../frontend/dist"
+const defaultMaxRequestBytes = 32 * 1024 * 1024
 
 type Server struct {
 	store    *store.MemoryStore
@@ -176,7 +177,73 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parser-profiles", s.saveParserProfile)
 	mux.HandleFunc("GET /api/parser-profiles", s.listParserProfiles)
 	mux.HandleFunc("/", s.spa)
-	return mux
+	return s.wrapHandler(mux)
+}
+
+func (s Server) wrapHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		allowedOrigin := allowedCORSOrigin(origin)
+		if allowedOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "authorization, content-type, x-api-key")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Max-Age", "600")
+		}
+
+		if r.Method == http.MethodOptions {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
+
+		if isAPIPath(r.URL.Path) && r.ContentLength > 0 {
+			limit := resolveMaxRequestBytes()
+			if r.ContentLength > limit {
+				writeError(w, http.StatusRequestEntityTooLarge, "request body exceeds configured limit")
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isAPIPath(pathValue string) bool {
+	return pathValue == "/api" || strings.HasPrefix(pathValue, "/api/")
+}
+
+func resolveMaxRequestBytes() int64 {
+	if raw := strings.TrimSpace(os.Getenv("JODATA_MAX_REQUEST_BYTES")); raw != "" {
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return int64(defaultMaxRequestBytes)
+}
+
+func allowedCORSOrigin(requestOrigin string) string {
+	raw := strings.TrimSpace(os.Getenv("JODATA_CORS_ORIGINS"))
+	if raw == "" {
+		return "*"
+	}
+	if raw == "*" {
+		return "*"
+	}
+	if requestOrigin == "" {
+		return ""
+	}
+	for _, allowed := range strings.Split(raw, ",") {
+		if strings.TrimSpace(allowed) == requestOrigin {
+			return requestOrigin
+		}
+	}
+	return ""
 }
 
 func (s Server) spa(w http.ResponseWriter, r *http.Request) {
