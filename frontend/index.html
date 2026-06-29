@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jodata</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+      :root {
+        --bg: #f7f3ea;
+        --ink: #17201b;
+        --muted: #66736c;
+        --line: #d8d1c3;
+        --panel: #fffaf0;
+        --accent: #0f766e;
+        --accent-2: #b45309;
+        --danger: #b91c1c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.08), transparent 34%),
+          radial-gradient(circle at 85% 12%, rgba(180, 83, 9, 0.16), transparent 26%),
+          var(--bg);
+        color: var(--ink);
+        font-family:
+          "Aptos",
+          "Segoe UI",
+          sans-serif;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 250, 240, 0.82);
+        backdrop-filter: blur(12px);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 750;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        min-height: calc(100vh - 65px);
+      }
+
+      aside {
+        border-right: 1px solid var(--line);
+        padding: 18px;
+        background: rgba(255, 250, 240, 0.68);
+      }
+
+      section {
+        padding: 22px;
+      }
+
+      label {
+        display: block;
+        margin: 0 0 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font: inherit;
+      }
+
+      input,
+      select,
+      textarea {
+        background: var(--panel);
+        color: var(--ink);
+        padding: 10px 11px;
+      }
+
+      textarea {
+        min-height: 84px;
+        resize: vertical;
+      }
+
+      button {
+        cursor: pointer;
+        border-color: var(--accent);
+        background: var(--accent);
+        color: white;
+        font-weight: 750;
+        padding: 10px 12px;
+      }
+
+      button.secondary {
+        border-color: var(--line);
+        background: transparent;
+        color: var(--ink);
+      }
+
+      .block {
+        margin-bottom: 18px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .status {
+        min-height: 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: rgba(255, 250, 240, 0.84);
+        padding: 10px;
+      }
+
+      .item strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .item span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      #chart {
+        width: 100%;
+        height: 460px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 14px;
+        background: rgba(255, 250, 240, 0.72);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px;
+        text-align: left;
+        font-size: 13px;
+      }
+
+      th {
+        color: var(--muted);
+      }
+
+      @media (max-width: 860px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        aside {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Jodata</h1>
+      <button class="secondary" id="refresh" style="width: auto">Refresh</button>
+    </header>
+    <main>
+      <aside>
+        <div class="block">
+          <label for="apiKey">API Key</label>
+          <input id="apiKey" type="password" />
+        </div>
+        <div class="block">
+          <label for="file">Source</label>
+          <input id="file" type="file" accept=".csv,.json,.xlsx,.xlsm" />
+        </div>
+        <div class="row block">
+          <div>
+            <label for="customer">Customer</label>
+            <input id="customer" />
+          </div>
+          <div>
+            <label for="sheet">Sheet</label>
+            <input id="sheet" />
+          </div>
+        </div>
+        <div class="row block">
+          <div>
+            <label for="headerRow">Header Row</label>
+            <input id="headerRow" type="number" min="1" />
+          </div>
+          <div>
+            <label for="requiredColumns">Required Columns</label>
+            <input id="requiredColumns" />
+          </div>
+        </div>
+        <div class="block">
+          <label for="sourceUrl">Source URL</label>
+          <input id="sourceUrl" placeholder="https://example.com/data.csv" />
+          <button class="secondary" id="uploadUrl" style="margin-top: 8px">Ingest from URL</button>
+        </div>
+        <div class="block">
+          <label for="apiSourceUrl">API Source URL</label>
+          <input id="apiSourceUrl" placeholder="https://api.example.com/sales" />
+          <div class="row block" style="margin-bottom: 0; margin-top: 8px;">
+            <select id="apiMethod">
+              <option>GET</option>
+              <option>POST</option>
+              <option>PUT</option>
+              <option>PATCH</option>
+            </select>
+            <button class="secondary" id="uploadApiSource" style="margin: 0;">Ingest API</button>
+          </div>
+          <label for="apiHeaders">API Headers (JSON)</label>
+          <input id="apiHeaders" placeholder='{"authorization":"Bearer token"}' />
+          <label for="apiQuery">API Query (JSON)</label>
+          <input id="apiQuery" placeholder='{"page":"2","limit":"50"}' />
+          <label for="apiBody">API Body (JSON)</label>
+          <textarea id="apiBody" rows="4" placeholder='{"from":"jodata"}'></textarea>
+        </div>
+        <div class="block">
+          <button class="secondary" id="saveProfile">Save Parser Profile</button>
+        </div>
+        <div class="block">
+          <button id="upload">Upload</button>
+        </div>
+        <div class="block">
+          <label for="intermediaryPayload">Intermediary Payload</label>
+          <textarea id="intermediaryPayload" rows="7" placeholder='{"name":"finance_report","source":{"type":"intermediary","name":"finance_upload"},"headers":["region","revenue"],"rows":[["west","10"],["east","20"]]}'></textarea>
+          <button class="secondary" id="importIntermediary" style="margin-top: 8px">Import Intermediary</button>
+        </div>
+        <div class="block">
+          <label for="bundleFile">Bundle File</label>
+          <input id="bundleFile" type="file" accept="application/json,.json" />
+          <div class="row block" style="margin-bottom: 0; margin-top: 8px;">
+            <button class="secondary" id="exportBundle">Export Bundle</button>
+            <button class="secondary" id="importBundle">Import Bundle</button>
+          </div>
+        </div>
+        <div class="block">
+          <label for="dataset">Dataset</label>
+          <select id="dataset"></select>
+        </div>
+        <div class="row block">
+          <div>
+            <label for="metricName">Metric</label>
+            <input id="metricName" placeholder="avg_revenue" />
+          </div>
+          <div>
+            <label for="metricAgg">Aggregate</label>
+            <select id="metricAgg">
+              <option>SUM</option>
+              <option>AVG</option>
+              <option>MIN</option>
+              <option>MAX</option>
+              <option>COUNT</option>
+            </select>
+          </div>
+        </div>
+        <div class="block">
+          <label for="metricColumn">Metric Column</label>
+          <input id="metricColumn" placeholder="revenue" />
+        </div>
+        <div class="block">
+          <button class="secondary" id="addMetric">Add Metric</button>
+        </div>
+        <div class="block">
+          <label for="prompt">Chart Prompt</label>
+          <textarea id="prompt">monthly revenue by region as a bar chart</textarea>
+        </div>
+        <div class="block">
+          <button id="createChart">Create Chart</button>
+        </div>
+        <div class="block">
+          <button class="secondary" id="refineChart">Refine Chart</button>
+        </div>
+        <div class="block">
+          <button class="secondary" id="previewQuery">Preview Query</button>
+        </div>
+        <div class="block">
+          <label for="dashboardTitle">Dashboard</label>
+          <input id="dashboardTitle" value="Analysis Dashboard" />
+        </div>
+        <div class="row block">
+          <div>
+            <label for="autoChartCount">Auto Chart Count</label>
+            <input id="autoChartCount" type="number" min="1" max="12" value="4" />
+          </div>
+          <div>
+            <label for="autoPrompts">Custom Prompts</label>
+            <input id="autoPrompts" placeholder='["trend by month","region share"]' />
+          </div>
+        </div>
+        <div class="block">
+          <button id="createDashboard">Create Dashboard</button>
+        </div>
+        <div class="block">
+          <button class="secondary" id="autoDashboard">Auto Dashboard</button>
+        </div>
+        <div class="block">
+          <button class="secondary" id="autoCharts">Auto Charts</button>
+        </div>
+        <div class="block">
+          <button class="secondary" id="autoBuild">Auto Build (Charts + Dashboard)</button>
+        </div>
+        <div class="block">
+          <button class="secondary" id="loadDashboard">Load Dashboard</button>
+        </div>
+        <div id="status" class="status"></div>
+      </aside>
+      <section>
+        <div class="toolbar">
+          <div>
+            <strong id="chartTitle">Chart</strong>
+            <div class="status" id="chartMeta"></div>
+          </div>
+        </div>
+        <div id="chart"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Datasets</th>
+              <th>Columns</th>
+              <th>Metrics</th>
+            </tr>
+          </thead>
+          <tbody id="datasets"></tbody>
+        </table>
+        <table>
+          <thead id="queryHead"></thead>
+          <tbody id="queryRows"></tbody>
+        </table>
+      </section>
+    </main>
+    <script>
+      const state = { datasets: [], charts: [], dashboards: [], currentChartId: "", currentDashboardId: "" };
+      const chart = echarts.init(document.getElementById("chart"));
+      const status = document.getElementById("status");
+      document.getElementById("apiKey").value = localStorage.getItem("jodata.apiKey") || "";
+      const defaultIntermediaryPayload = `{
+  "name": "finance_report",
+  "source": {
+    "type": "intermediary",
+    "name": "finance_upload"
+  },
+  "headers": ["region", "revenue"],
+  "rows": [
+    ["west", "10"],
+    ["east", "20"]
+  ],
+  "metrics": [
+    {
+      "name": "avg_revenue",
+      "column": "revenue",
+      "aggregate": "AVG"
+    }
+  ]
+}`;
+
+      function setStatus(message, isError = false) {
+        status.textContent = message;
+        status.className = isError ? "status error" : "status";
+      }
+
+      async function api(path, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        const key = document.getElementById("apiKey").value.trim();
+        localStorage.setItem("jodata.apiKey", key);
+        if (key) options.headers["authorization"] = `Bearer ${key}`;
+        const res = await fetch(path, options);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+      }
+
+      async function refresh() {
+        state.datasets = await api("/api/datasets");
+        state.charts = await api("/api/charts");
+        state.dashboards = await api("/api/dashboards");
+        renderDatasets();
+      }
+
+      function readRequiredColumns() {
+        return document
+          .getElementById("requiredColumns")
+          .value.split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+
+      function renderDatasets() {
+        const select = document.getElementById("dataset");
+        select.innerHTML = state.datasets
+          .map((ds) => `<option value="${ds.id}">${ds.name}</option>`)
+          .join("");
+
+        document.getElementById("datasets").innerHTML = state.datasets
+          .map(
+            (ds) => `<tr>
+              <td>${ds.name}<br /><span>${ds.source.type}</span></td>
+              <td>${ds.columns.map((c) => c.name).join(", ")}</td>
+              <td>${ds.metrics.map((m) => m.name).join(", ")}</td>
+            </tr>`,
+          )
+          .join("");
+      }
+
+      async function upload() {
+        const file = document.getElementById("file").files[0];
+        if (!file) {
+          setStatus("Select a source file.", true);
+          return;
+        }
+        const form = new FormData();
+        form.append("file", file);
+        form.append("customer_id", document.getElementById("customer").value);
+        form.append("sheet", document.getElementById("sheet").value);
+        form.append("header_row", document.getElementById("headerRow").value);
+        form.append("required_columns", readRequiredColumns().join(","));
+        const ds = await api("/api/sources", { method: "POST", body: form });
+        setStatus(`Dataset ${ds.id} created.`);
+        await refresh();
+        document.getElementById("dataset").value = ds.id;
+      }
+
+      async function uploadFromURL() {
+        const url = document.getElementById("sourceUrl").value.trim();
+        if (!url) {
+          setStatus("Provide a source URL.", true);
+          return;
+        }
+        const ds = await api("/api/sources/url", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            url: url,
+            customer_id: document.getElementById("customer").value,
+            preferred_sheet: document.getElementById("sheet").value,
+            header_row: Number(document.getElementById("headerRow").value || 0),
+            required_columns: readRequiredColumns(),
+          }),
+        });
+        setStatus(`Dataset ${ds.id} created from URL.`);
+        await refresh();
+        document.getElementById("dataset").value = ds.id;
+      }
+
+      async function uploadFromAPI() {
+        const url = document.getElementById("apiSourceUrl").value.trim();
+        if (!url) {
+          setStatus("Provide an API source URL.", true);
+          return;
+        }
+
+        const method = document.getElementById("apiMethod").value || "GET";
+        const buildJSONField = (id, label) => {
+          const raw = document.getElementById(id).value.trim();
+          if (!raw) {
+            return undefined;
+          }
+          try {
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== "object") {
+              throw new Error(`${label} must be a JSON object`);
+            }
+            return parsed;
+          } catch (err) {
+            throw new Error(`Invalid ${label.toLowerCase()}: ${err.message}`);
+          }
+        };
+
+        let headers;
+        let query;
+        try {
+          headers = buildJSONField("apiHeaders", "Headers");
+          query = buildJSONField("apiQuery", "Query");
+        } catch (error) {
+          setStatus(error.message, true);
+          return;
+        }
+        let body;
+        const rawBody = document.getElementById("apiBody").value.trim();
+        if (rawBody) {
+          try {
+            body = JSON.parse(rawBody);
+          } catch (error) {
+            setStatus("Invalid API body JSON.", true);
+            return;
+          }
+        }
+
+        const ds = await api("/api/sources/api", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            url,
+            method,
+            headers,
+            query,
+            body,
+            customer_id: document.getElementById("customer").value,
+            preferred_sheet: document.getElementById("sheet").value,
+            header_row: Number(document.getElementById("headerRow").value || 0),
+            required_columns: readRequiredColumns(),
+          }),
+        });
+        setStatus(`Dataset ${ds.id} created from API source.`);
+        await refresh();
+        document.getElementById("dataset").value = ds.id;
+      }
+
+      async function importIntermediary() {
+        const raw = document.getElementById("intermediaryPayload").value.trim();
+        if (!raw) {
+          setStatus("Intermediary payload is required.", true);
+          return;
+        }
+        let payload;
+        try {
+          payload = JSON.parse(raw);
+        } catch (error) {
+          setStatus("Invalid intermediary payload JSON.", true);
+          return;
+        }
+        if (!payload.name) {
+          setStatus("Intermediary payload must include a name.", true);
+          return;
+        }
+        if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
+          setStatus("Intermediary payload must include headers and rows.", true);
+          return;
+        }
+        if (!payload.source) {
+          payload.source = { type: "intermediary", name: payload.name };
+        }
+        if (!payload.source.type) {
+          payload.source.type = "intermediary";
+        }
+        if (!payload.source.name) {
+          payload.source.name = payload.name;
+        }
+        const ds = await api("/api/datasets/intermediary", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        setStatus(`Intermediary dataset ${ds.id} created.`);
+        await refresh();
+        document.getElementById("dataset").value = ds.id;
+      }
+
+      async function exportBundle() {
+        const key = document.getElementById("apiKey").value.trim();
+        const headers = {};
+        if (key) {
+          headers["authorization"] = `Bearer ${key}`;
+        }
+        const res = await fetch("/api/export", { headers });
+        const text = await res.text();
+        let body;
+        try {
+          body = JSON.parse(text);
+        } catch (error) {
+          throw new Error(text || "failed to parse export response");
+        }
+        if (!res.ok) {
+          throw new Error(body.error || res.statusText);
+        }
+        const blob = new Blob([JSON.stringify(body, null, 2)], { type: "application/json" });
+        const objectURL = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectURL;
+        link.download = "jodata-bundle.json";
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objectURL);
+        setStatus("Bundle exported.");
+      }
+
+      async function importBundle() {
+        const file = document.getElementById("bundleFile").files[0];
+        if (!file) {
+          setStatus("Select a bundle file.", true);
+          return;
+        }
+        let payload;
+        try {
+          payload = JSON.parse(await file.text());
+        } catch (error) {
+          setStatus("Invalid bundle JSON.", true);
+          return;
+        }
+        await api("/api/import", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        setStatus("Bundle imported.");
+        await refresh();
+      }
+
+      async function createChart() {
+        const datasetId = document.getElementById("dataset").value;
+        if (!datasetId) {
+          setStatus("Create or select a dataset.", true);
+          return;
+        }
+        const cfg = await api("/api/charts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            dataset_id: datasetId,
+            prompt: document.getElementById("prompt").value,
+          }),
+        });
+        state.currentChartId = cfg.id;
+        document.getElementById("chartTitle").textContent = cfg.title;
+        document.getElementById("chartMeta").textContent = `${cfg.id} / ${cfg.type}`;
+        chart.clear();
+        chart.setOption(cfg.echarts);
+        setStatus(`Chart ${cfg.id} created.`);
+        await refresh();
+      }
+
+      async function refineChart() {
+        if (!state.currentChartId) {
+          setStatus("Create a chart first.", true);
+          return;
+        }
+        const cfg = await api(`/api/charts/${state.currentChartId}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ prompt: document.getElementById("prompt").value }),
+        });
+        document.getElementById("chartTitle").textContent = cfg.title;
+        document.getElementById("chartMeta").textContent = `${cfg.id} / ${cfg.type}`;
+        chart.clear();
+        chart.setOption(cfg.echarts);
+        setStatus(`Chart ${cfg.id} updated.`);
+        await refresh();
+      }
+
+      async function previewQuery() {
+        const datasetId = document.getElementById("dataset").value;
+        if (!datasetId) {
+          setStatus("Create or select a dataset.", true);
+          return;
+        }
+        const ds = state.datasets.find((item) => item.id === datasetId);
+        const metric = ds?.metrics.find((m) => m.name !== "count_rows")?.name || "count_rows";
+        const group = ds?.columns.find((c) => c.role === "dimension")?.name;
+        const result = await api(`/api/datasets/${datasetId}/query`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            metrics: [metric],
+            group_by: group ? [group] : [],
+            limit: 25,
+          }),
+        });
+        document.getElementById("queryHead").innerHTML = `<tr>${result.columns.map((col) => `<th>${col}</th>`).join("")}</tr>`;
+        document.getElementById("queryRows").innerHTML = result.rows
+          .map((row) => `<tr>${result.columns.map((col) => `<td>${row[col] ?? ""}</td>`).join("")}</tr>`)
+          .join("");
+        setStatus("Query preview updated.");
+      }
+
+      async function addMetric() {
+        const datasetId = document.getElementById("dataset").value;
+        if (!datasetId) {
+          setStatus("Create or select a dataset.", true);
+          return;
+        }
+        const metric = await api(`/api/datasets/${datasetId}/metrics`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: document.getElementById("metricName").value,
+            column: document.getElementById("metricColumn").value,
+            aggregate: document.getElementById("metricAgg").value,
+          }),
+        });
+        setStatus(`Metric ${metric.name} created.`);
+        await refresh();
+      }
+
+      async function saveProfile() {
+        const customerId = document.getElementById("customer").value.trim();
+        if (!customerId) {
+          setStatus("Customer is required.", true);
+          return;
+        }
+        const required = readRequiredColumns();
+        const profile = await api("/api/parser-profiles", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            customer_id: customerId,
+            preferred_sheet: document.getElementById("sheet").value,
+            header_row: Number(document.getElementById("headerRow").value || 0),
+            required_columns: required,
+          }),
+        });
+        setStatus(`Profile for ${profile.customer_id} saved.`);
+      }
+
+      async function createDashboard() {
+        if (!state.currentChartId) {
+          setStatus("Create a chart first.", true);
+          return;
+        }
+        const dash = await api("/api/dashboards", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: document.getElementById("dashboardTitle").value,
+            chart_ids: [state.currentChartId],
+          }),
+        });
+        state.currentDashboardId = dash.id;
+        setStatus(`Dashboard ${dash.id} created.`);
+      }
+
+      function buildAutoChartPayload() {
+        const maxCharts = Number(document.getElementById("autoChartCount").value || 4);
+        const payload = {
+          max_charts: Number.isFinite(maxCharts) && maxCharts > 0 ? Math.min(Math.max(Math.floor(maxCharts), 1), 12) : 4,
+        };
+        const rawPrompts = document.getElementById("autoPrompts").value.trim();
+        if (!rawPrompts) {
+          return payload;
+        }
+        let prompts;
+        try {
+          prompts = JSON.parse(rawPrompts);
+        } catch (error) {
+          throw new Error("Invalid custom prompts JSON.");
+        }
+        if (!Array.isArray(prompts)) {
+          throw new Error("Custom prompts must be a JSON array.");
+        }
+        if (prompts.length > 0) {
+          payload.prompts = prompts;
+        }
+        return payload;
+      }
+
+      async function autoDashboard() {
+        const datasetId = document.getElementById("dataset").value;
+        if (!datasetId) {
+          setStatus("Create or select a dataset.", true);
+          return;
+        }
+        let payload;
+        try {
+          payload = buildAutoChartPayload();
+        } catch (error) {
+          setStatus(error.message, true);
+          return;
+        }
+        payload.title = document.getElementById("dashboardTitle").value || "Analysis Dashboard";
+        const dash = await api(`/api/datasets/${datasetId}/auto-dashboard`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        state.currentDashboardId = dash.id;
+        const first = dash.charts[0];
+        if (first) {
+          state.currentChartId = first.id;
+          document.getElementById("chartTitle").textContent = first.title;
+          document.getElementById("chartMeta").textContent = `${dash.title} / ${first.id}`;
+          chart.clear();
+          chart.setOption(first.echarts);
+        }
+        setStatus(`Dashboard ${dash.id} generated.`);
+        await refresh();
+      }
+
+      async function autoCharts() {
+        const datasetId = document.getElementById("dataset").value;
+        if (!datasetId) {
+          setStatus("Create or select a dataset.", true);
+          return;
+        }
+        let payload;
+        try {
+          payload = buildAutoChartPayload();
+        } catch (error) {
+          setStatus(error.message, true);
+          return;
+        }
+        const result = await api(`/api/datasets/${datasetId}/auto-charts`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const charts = result.charts || [];
+        if (charts.length === 0) {
+          setStatus("No charts generated.", true);
+          return;
+        }
+        const first = charts[0];
+        state.currentChartId = first.id;
+        document.getElementById("chartTitle").textContent = first.title;
+        document.getElementById("chartMeta").textContent = `${result.dataset_id} / ${first.id}`;
+        chart.clear();
+        chart.setOption(first.echarts);
+        setStatus(`${charts.length} charts auto-generated for dataset ${datasetId}.`);
+        await refresh();
+      }
+
+      async function autoBuild() {
+        const datasetId = document.getElementById("dataset").value;
+        if (!datasetId) {
+          setStatus("Create or select a dataset.", true);
+          return;
+        }
+        let payload;
+        try {
+          payload = buildAutoChartPayload();
+        } catch (error) {
+          setStatus(error.message, true);
+          return;
+        }
+        payload.title = document.getElementById("dashboardTitle").value || "Analysis Dashboard";
+        const result = await api(`/api/datasets/${datasetId}/auto-build`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const charts = result.charts || [];
+        if (charts.length === 0) {
+          setStatus("No charts generated.", true);
+          return;
+        }
+        const first = charts[0];
+        state.currentDashboardId = result.dashboard_id;
+        state.currentChartId = first.id;
+        document.getElementById("chartTitle").textContent = first.title;
+        document.getElementById("chartMeta").textContent = `${result.title} / ${first.id}`;
+        chart.clear();
+        chart.setOption(first.echarts);
+        setStatus(`${charts.length} charts generated and dashboard ${result.dashboard_id} created.`);
+        await refresh();
+      }
+
+      async function loadDashboard() {
+        const id = state.currentDashboardId || state.dashboards[0]?.id;
+        if (!id) {
+          setStatus("Create a dashboard first.", true);
+          return;
+        }
+        const dash = await api(`/api/dashboards/${id}`);
+        state.currentDashboardId = dash.id;
+        const first = dash.charts[0];
+        if (first) {
+          state.currentChartId = first.id;
+          document.getElementById("chartTitle").textContent = first.title;
+          document.getElementById("chartMeta").textContent = `${dash.title} / ${first.id}`;
+          chart.clear();
+          chart.setOption(first.echarts);
+        }
+        setStatus(`Dashboard ${dash.id} loaded.`);
+      }
+
+      document.getElementById("upload").addEventListener("click", () => upload().catch((err) => setStatus(err.message, true)));
+      document.getElementById("uploadUrl").addEventListener("click", () => uploadFromURL().catch((err) => setStatus(err.message, true)));
+      document.getElementById("uploadApiSource").addEventListener("click", () => uploadFromAPI().catch((err) => setStatus(err.message, true)));
+      document.getElementById("importIntermediary").addEventListener("click", () => importIntermediary().catch((err) => setStatus(err.message, true)));
+      document.getElementById("exportBundle").addEventListener("click", () => exportBundle().catch((err) => setStatus(err.message, true)));
+      document.getElementById("importBundle").addEventListener("click", () => importBundle().catch((err) => setStatus(err.message, true)));
+      document.getElementById("saveProfile").addEventListener("click", () => saveProfile().catch((err) => setStatus(err.message, true)));
+      document.getElementById("addMetric").addEventListener("click", () => addMetric().catch((err) => setStatus(err.message, true)));
+      document.getElementById("createChart").addEventListener("click", () => createChart().catch((err) => setStatus(err.message, true)));
+      document.getElementById("refineChart").addEventListener("click", () => refineChart().catch((err) => setStatus(err.message, true)));
+      document.getElementById("previewQuery").addEventListener("click", () => previewQuery().catch((err) => setStatus(err.message, true)));
+      document.getElementById("createDashboard").addEventListener("click", () => createDashboard().catch((err) => setStatus(err.message, true)));
+      document.getElementById("autoDashboard").addEventListener("click", () => autoDashboard().catch((err) => setStatus(err.message, true)));
+      document.getElementById("autoCharts").addEventListener("click", () => autoCharts().catch((err) => setStatus(err.message, true)));
+      document.getElementById("autoBuild").addEventListener("click", () => autoBuild().catch((err) => setStatus(err.message, true)));
+      document.getElementById("loadDashboard").addEventListener("click", () => loadDashboard().catch((err) => setStatus(err.message, true)));
+      document.getElementById("refresh").addEventListener("click", () => refresh().catch((err) => setStatus(err.message, true)));
+      document.getElementById("intermediaryPayload").value = defaultIntermediaryPayload;
+      window.addEventListener("resize", () => chart.resize());
+      refresh().catch((err) => setStatus(err.message, true));
+    </script>
+  </body>
+</html>

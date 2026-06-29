@@ -1,0 +1,140 @@
+{
+  "next": 4,
+  "datasets": {
+    "dataset_1": {
+      "id": "dataset_1",
+      "name": "sales",
+      "source": {
+        "type": "csv",
+        "name": "sales.csv"
+      },
+      "columns": [
+        {
+          "name": "month",
+          "original": "month",
+          "type": "date",
+          "role": "temporal",
+          "is_temporal": true,
+          "is_measure": false
+        },
+        {
+          "name": "region",
+          "original": "region",
+          "type": "string",
+          "role": "dimension",
+          "is_temporal": false,
+          "is_measure": false
+        },
+        {
+          "name": "revenue",
+          "original": "revenue",
+          "type": "number",
+          "role": "measure",
+          "is_temporal": false,
+          "is_measure": true
+        }
+      ],
+      "metrics": [
+        {
+          "name": "count_rows",
+          "label": "Count rows",
+          "expression": "COUNT(*)",
+          "column": "",
+          "aggregate": "COUNT"
+        },
+        {
+          "name": "sum_revenue",
+          "label": "Sum revenue",
+          "expression": "SUM(revenue)",
+          "column": "revenue",
+          "aggregate": "SUM"
+        }
+      ],
+      "rows": [
+        {
+          "month": "2026-01-01",
+          "region": "west",
+          "revenue": "10"
+        },
+        {
+          "month": "2026-02-01",
+          "region": "east",
+          "revenue": "20"
+        },
+        {
+          "month": "2026-03-01",
+          "region": "west",
+          "revenue": "5"
+        }
+      ]
+    }
+  },
+  "charts": {
+    "chart_2": {
+      "id": "chart_2",
+      "dataset_id": "dataset_1",
+      "title": "Revenue By Region As A Bar Chart",
+      "type": "bar",
+      "intent": {
+        "dataset_id": "dataset_1",
+        "chart_type": "bar",
+        "title": "Revenue By Region As A Bar Chart",
+        "metrics": [
+          "sum_revenue"
+        ],
+        "group_by": [
+          "region"
+        ],
+        "time_grain": "month"
+      },
+      "echarts": {
+        "series": [
+          {
+            "data": [
+              20,
+              15
+            ],
+            "name": "sum_revenue",
+            "type": "bar"
+          }
+        ],
+        "title": {
+          "text": "Revenue By Region As A Bar Chart"
+        },
+        "tooltip": {
+          "trigger": "axis"
+        },
+        "xAxis": {
+          "data": [
+            "east",
+            "west"
+          ],
+          "name": "region",
+          "type": "category"
+        },
+        "yAxis": {
+          "type": "value"
+        }
+      }
+    }
+  },
+  "dashboards": {
+    "dashboard_3": {
+      "id": "dashboard_3",
+      "title": "Sales Dashboard",
+      "chart_ids": [
+        "chart_2"
+      ],
+      "layout": [
+        {
+          "chart_id": "chart_2",
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      ]
+    }
+  },
+  "profiles": {}
+}
